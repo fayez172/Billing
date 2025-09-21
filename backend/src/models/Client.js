@@ -63,6 +63,45 @@ class Client {
     const result = await pool.query(query, [clientId, type, date]);
     return result.rows[0]?.price_taka || null;
   }
+  
+  static async addPrice(clientId, type, price, effectiveFrom, effectiveTo = null) {
+    const query = `
+      INSERT INTO client_prices (client_id, type, price_taka, effective_from, effective_to)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `;
+    
+    const values = [clientId, type, price, effectiveFrom, effectiveTo];
+    const result = await pool.query(query, values);
+    return result.rows[0];
+  }
+  
+  static async bulkImportPrices(clientId, prices) {
+    const client = await this.findById(clientId);
+    if (!client) {
+      throw new Error('Client not found');
+    }
+    
+    const insertedPrices = [];
+    for (const [type, price] of Object.entries(prices)) {
+      if (price !== null && price !== undefined && price !== '') {
+        try {
+          const priceRecord = await this.addPrice(
+            clientId, 
+            type, 
+            parseFloat(price), 
+            new Date(), 
+            null
+          );
+          insertedPrices.push(priceRecord);
+        } catch (error) {
+          console.error(`Error importing price for ${type}:`, error.message);
+        }
+      }
+    }
+    
+    return insertedPrices;
+  }
 }
 
 export default Client;

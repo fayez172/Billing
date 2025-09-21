@@ -100,6 +100,31 @@ const radiologistsController = {
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
+  },
+  
+  // Bulk import radiologist fees from CSV data
+  importFees: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { fees } = req.body;
+      
+      // Check if radiologist exists
+      const radiologist = await Radiologist.findById(id);
+      if (!radiologist) {
+        return res.status(404).json({ error: 'Radiologist not found' });
+      }
+      
+      // Import fees
+      const importedFees = await Radiologist.bulkImportFees(id, fees);
+      
+      res.json({
+        message: 'Fees imported successfully',
+        count: importedFees.length,
+        fees: importedFees
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
   }
 };
 

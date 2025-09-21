@@ -101,6 +101,31 @@ const clientsController = {
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
+  },
+  
+  // Bulk import client prices from CSV data
+  importPrices: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { prices } = req.body;
+      
+      // Check if client exists
+      const client = await Client.findById(id);
+      if (!client) {
+        return res.status(404).json({ error: 'Client not found' });
+      }
+      
+      // Import prices
+      const importedPrices = await Client.bulkImportPrices(id, prices);
+      
+      res.json({
+        message: 'Prices imported successfully',
+        count: importedPrices.length,
+        prices: importedPrices
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
   }
 };
 

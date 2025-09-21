@@ -27,6 +27,7 @@ router.put('/clients/:id', clientsController.update);
 router.get('/clients/:id/prices', clientsController.getPrices);
 router.post('/clients/:id/prices', clientsController.addPrice);
 router.put('/clients/:id/prices/:priceId', clientsController.updatePrice);
+router.post('/clients/:id/import-prices', clientsController.importPrices);
 
 // Radiologist routes
 router.get('/radiologists', radiologistsController.getAll);
@@ -36,6 +37,7 @@ router.put('/radiologists/:id', radiologistsController.update);
 router.get('/radiologists/:id/prices', radiologistsController.getPrices);
 router.post('/radiologists/:id/prices', radiologistsController.addPrice);
 router.put('/radiologists/:id/prices/:priceId', radiologistsController.updatePrice);
+router.post('/radiologists/:id/import-fees', radiologistsController.importFees);
 
 // Invoice routes
 router.post('/invoices', invoicesController.create);

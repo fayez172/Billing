@@ -104,8 +104,13 @@ const invoicesController = {
       const { client_id, period_start, period_end } = req.body;
       
       // Get studies for this client and period
+      const client = await Client.findById(client_id);
+      if (!client) {
+        return res.status(404).json({ error: 'Client not found' });
+      }
+      
       const studies = await Study.findAllWithFilters({
-        hospital: (await Client.findById(client_id)).name,
+        hospital: client.name,
         dateFrom: period_start,
         dateTo: period_end
       });
@@ -117,18 +122,26 @@ const invoicesController = {
           if (!groupedStudies[study.type]) {
             groupedStudies[study.type] = {
               type: study.type,
-              qty: 0,
-              // Price will be looked up later
-              price: 0,
-              total: 0
+              qty: 0
             };
           }
           groupedStudies[study.type].qty++;
         }
       }
       
-      // Convert to array
-      const lineItems = Object.values(groupedStudies);
+      // Convert to array and add pricing
+      const lineItems = await Promise.all(Object.values(groupedStudies).map(async (item, index) => {
+        // Get price for this type and client
+        const price = await Client.getPriceForType(client_id, item.type, new Date());
+        
+        return {
+          id: index + 1,
+          type: item.type,
+          qty: item.qty,
+          price: price || 0,
+          total: (price || 0) * item.qty
+        };
+      }));
       
       res.json(lineItems);
     } catch (error) {

@@ -36,6 +36,12 @@ const upload = multer({
   }
 });
 
+// Normalize text by trimming, uppercasing, and removing extra whitespace
+const normalizeText = (text) => {
+  if (!text) return '';
+  return text.toString().trim().toUpperCase().replace(/\s+/g, ' ');
+};
+
 const processFile = async (filePath) => {
   try {
     // Read the file
@@ -58,26 +64,26 @@ const processFile = async (filePath) => {
       
       // Validate required fields
       if (!row['Workflow ID'] || !row['Procedure'] || !row['Modality']) {
-        errors.push(`Row ${i + 1}: Missing required fields`);
+        errors.push(`Row ${i + 2}: Missing required fields (Workflow ID, Procedure, or Modality)`);
         continue;
       }
       
       // Create study object
       const studyData = {
-        workflow_id: row['Workflow ID'],
-        mrn: row['MRN'] || null,
-        procedure_raw: row['Procedure'],
+        workflow_id: row['Workflow ID'].toString(),
+        mrn: row['MRN'] ? row['MRN'].toString() : null,
+        procedure_raw: row['Procedure'].toString(),
         report_comp_time: row['Report Comp Time'] ? new Date(row['Report Comp Time']) : null,
-        final_rad_name: row['Final Rad'] || null,
-        modality: row['Modality'],
-        hospital_name: row['Hospital'] || null,
+        final_rad_name: row['Final Rad'] ? row['Final Rad'].toString() : null,
+        modality: row['Modality'].toString(),
+        hospital_name: row['Hospital'] ? row['Hospital'].toString() : null,
         image_count: row['Image Count'] ? parseInt(row['Image Count']) : null,
-        patient_name: row['Patient'] || null
+        patient_name: row['Patient'] ? row['Patient'].toString() : null
       };
       
       // Try to map the procedure
-      const normalizedModality = studyData.modality.trim().toUpperCase();
-      const normalizedProcedure = studyData.procedure_raw.trim().toUpperCase();
+      const normalizedModality = normalizeText(studyData.modality);
+      const normalizedProcedure = normalizeText(studyData.procedure_raw);
       
       const { mapping, confidence } = await Mapping.findByModalityAndProcedure(
         normalizedModality, 
@@ -87,6 +93,7 @@ const processFile = async (filePath) => {
       if (mapping) {
         studyData.type = mapping.type;
         studyData.typedr = mapping.typedr;
+        studyData.mapped_by = null; // Will be set when saved
         studyData.mapping_confidence = confidence;
         
         if (confidence === 'exact') {
@@ -97,6 +104,7 @@ const processFile = async (filePath) => {
       } else {
         studyData.type = null;
         studyData.typedr = null;
+        studyData.mapped_by = null;
         studyData.mapping_confidence = 'manual';
         unmappedCount++;
       }
@@ -126,7 +134,8 @@ const processFile = async (filePath) => {
       mapped: mappedCount,
       fuzzy: fuzzyCount,
       unmapped: unmappedCount,
-      errors
+      errors,
+      data: parsedData.slice(0, 50) // Return first 50 rows for preview
     };
   } catch (error) {
     throw new Error(`Error processing file: ${error.message}`);
@@ -176,12 +185,20 @@ const uploadController = {
       const jsonData = xlsx.utils.sheet_to_json(worksheet);
       const previewData = jsonData.slice(0, 50);
       
+      // Clean up uploaded file
+      fs.unlinkSync(req.file.path);
+      
       res.json({
         totalRows: jsonData.length,
         previewRows: previewData.length,
         data: previewData
       });
     } catch (error) {
+      // Clean up uploaded file if exists
+      if (req.file && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      
       res.status(500).json({ error: error.message });
     }
   }

@@ -63,6 +63,45 @@ class Radiologist {
     const result = await pool.query(query, [radiologistId, typedr, date]);
     return result.rows[0]?.fee || null;
   }
+  
+  static async addFee(radiologistId, typedr, fee, effectiveFrom, effectiveTo = null) {
+    const query = `
+      INSERT INTO radiologist_prices (radiologist_id, typedr, fee, effective_from, effective_to)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `;
+    
+    const values = [radiologistId, typedr, fee, effectiveFrom, effectiveTo];
+    const result = await pool.query(query, values);
+    return result.rows[0];
+  }
+  
+  static async bulkImportFees(radiologistId, fees) {
+    const radiologist = await this.findById(radiologistId);
+    if (!radiologist) {
+      throw new Error('Radiologist not found');
+    }
+    
+    const insertedFees = [];
+    for (const [typedr, fee] of Object.entries(fees)) {
+      if (fee !== null && fee !== undefined && fee !== '') {
+        try {
+          const feeRecord = await this.addFee(
+            radiologistId, 
+            typedr, 
+            parseFloat(fee), 
+            new Date(), 
+            null
+          );
+          insertedFees.push(feeRecord);
+        } catch (error) {
+          console.error(`Error importing fee for ${typedr}:`, error.message);
+        }
+      }
+    }
+    
+    return insertedFees;
+  }
 }
 
 export default Radiologist;
